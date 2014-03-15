@@ -18,11 +18,8 @@ general.send500 = function(res, msg){
 };
 
 general.getOptions = function(res){
-	res.json({"Get Events": "/events" , "Get One Event":" events/Event_ID_# ",
-		"Post new event":"events/new","delete event (DEL)":"events/event_id_#","Get comments":"events/event_id_#/comments",
-		"post comments":"events/envent_id_#/comments",
-		"get a location":"events/location/event_id_#","Get all locations":"events/location/list",
-		"Get a contact":"events/contact/eventID_#","Get All Contacts":"events/contact/list","get options":"/options"});
+	res.json({"Get Patients": "/patients", 
+			"Get One Patient": "/patient"`});
 	res.end();
 };
 
