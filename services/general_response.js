@@ -19,7 +19,7 @@ general.send500 = function(res, msg){
 
 general.getOptions = function(res){
 	res.json({"Get Patients": "/patients", 
-			"Get One Patient": "/patient"`});
+			"Get One Patient": "/patient"});
 	res.end();
 };
 
