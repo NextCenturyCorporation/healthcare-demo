@@ -11621,41 +11621,6 @@ dojox.secure.capability = {
 
 
 /**
- * @fileoverview Basic auditing capability.  Audit info is sent to the server, which then 
- *      routes the info to the lof4j handler (which can then route it to any other 
- *      needed handler).
- */
-
-/**
- * @namespace
- */
-var Ozone = Ozone || {};
-
-/**
- * @namespace
- */
-Ozone.audit = Ozone.audit || {};
-
-/**
- * @description Basic auditing capability - meant to be called by other methods
- *    which need to send audit info to the server  
- * @since OWF 7.1.0
- *
- * @param {Object} data
- */
-Ozone.audit.log = function(data) {
-	
-    Ozone.util.Transport.send({
-        url: OWF.getContainerUrl() + '/audit',
-        method: 'POST',
-        onSuccess: function(response) {
-        },
-        autoSendVersion : false,
-        content : data
-    });
-};
-
-/**
  * @ignore
  */
 var Ozone = Ozone || {};
@@ -11701,27 +11666,27 @@ var Ozone = Ozone || {};
 Ozone.version = Ozone.version || {};
 
 Ozone.version = {
-		
-		owfversion : '7.1.0-GA',
 
-        mpversion : '2.3',
+    owfversion: '7.0.1-GA',
 
-		preference : '-v1',
-		
-		eventing : '-v1',
-		
-		widgetLauncher : '-v1',
-		
-		state : '-v1',
-		
-        dragAndDrop : '-v1',
+    mpversion: '2.3',
 
-        widgetChrome : '-v1',
+    preference: '-v1',
 
-		logging : '-v1',
-		
-		language : '-v1'
-		
+    eventing: '-v1',
+
+    widgetLauncher: '-v1',
+
+    state: '-v1',
+
+    dragAndDrop: '-v1',
+
+    widgetChrome: '-v1',
+
+    logging: '-v1',
+
+    language: '-v1'
+
 };
 
 /**
@@ -11731,8 +11696,6 @@ var Ozone = Ozone || {};
 Ozone.util = Ozone.util || {};
 Ozone.util.formField = Ozone.util.formField || {};
 Ozone.config = Ozone.config || {};
-Ozone.config.dataguard = Ozone.config.dataguard || {};
-Ozone.widgetAccesses = Ozone.widgetAccesses || {};
 
 /**
  * @private
@@ -12197,260 +12160,6 @@ Ozone.util.cloneDashboard = function(dashboardCfg, regenerateIds, removeLaunchDa
 Ozone.util.createRequiredLabel= function(label) {
     return "<span class='required-label'>" + label + " <span class='required-indicator'>*</span></span>";
 }
-
-/**
- * @private
- *
- * @description This method determine whether a channel name is a reserved owf channel name.
- *
- * @param {String} channel The channel name
- *
- * @returns {Boolean} True if the channel name is reserved, false otherwise.
- */
-Ozone.util.isReservedChannel = function(channel) {
-	// This is a horrible way of reserving channel names. Need to make this some sort of calculation
-	// so that widgets can't just pass data on an OWF reserved channel name to skirt security.
-	// I'm thinking generating a random guid at the start of a session to append to all OWF reserved channel
-	// names.
-	if(channel) {
-		if (channel.indexOf('_WIDGET_STATE_CHANNEL_') == 0 || 
-				channel == '_WIDGET_LAUNCHER_CHANNEL' || 
-				channel == '_ADD_WIDGET_CHANNEL' || 
-				channel == '_dragStart' || 
-				channel == '_dragOverWidget' || 
-				channel == '_dragOutName' || 
-				channel == '_dragStopInContainer' || 
-				channel == '_dragStopInWidget' || 
-				channel == '_dragSendData' || 
-				channel == '_dropReceiveData' || 
-				channel == '_intents' || 
-				channel == '_intents_receive' || 
-				channel == 'Ozone._WidgetChromeChannel' || 
-				channel == '_WIDGET_LAUNCHER_CHANNEL' || 
-				channel == '_widgetReady')
-			
-			return true;
-	}
-	return false;
-};
-
-/**
-Returns .
- *
- * @description This method determines whether or not the widget with the specified id has the specified access level.
- *
- * @param {Object} cfg Config object
- *
-*/
-Ozone.util.hasAccess = function(cfg) {
-	var widgetId, accessLevel, channel, senderId, callback;	
-	
-	// Make sure cfg object was passed in and flag to check access is set to true
-	if (!cfg || !cfg.widgetId || !cfg.callback) {
-		var response = "Insufficient information provided to determine access level.";
-        if (!Ozone.Msg)
-            Ozone.util.ErrorDlg.show(response,200,50);
-        else
-            Ozone.Msg.alert('Error',response,null,this,{
-                cls: "owfAlert"
-            });
-        
-        if (cfg.callback) {
-			cfg.callback({
-				widgetId: widgetId,
-				accessLevel: accessLevel,
-				hasAccess: false
-			});
-        }
-		return;
-	} else if (!Ozone.config.dataguard.restrictMessages) {
-		cfg.callback({
-			widgetId: widgetId,
-			accessLevel: accessLevel,
-			hasAccess: true
-		});
-		return;
-	} else {
-		widgetId = cfg.widgetId;
-		accessLevel = cfg.accessLevel;
-		channel = cfg.channel;
-		senderId = cfg.senderId;
-		callback = cfg.callback;
-	}
-	
-	// Allow OWF reserved channels to receive all data because those are used for 
-	// OWF-specific things like drag-and-drop
-	if(Ozone.util.isReservedChannel(cfg.channel)) {
-		callback({
-			widgetId: widgetId,
-			accessLevel: accessLevel,
-			hasAccess: true
-		});
-		return;
-	}
-	
-	// Err on the side of caution by defaulting to false
-	var hasAccess = false; 
-	
-	// Must specify either an accessLevel or senderId
-	if (!accessLevel) {
-		if (!senderId || !Ozone.config.dataguard.allowMessagesWithoutAccessLevel) {
-			Ozone.audit.log({
-				message: "Widget with id " + widgetId + " could not receive data because no access level was provided.",
-                accessOutcomeGood: false,
-                outcomeCategory: Ozone.util.hasAccess.outcomeCategories.noLevelGiven,
-                sendingWidget: senderId,
-                receivingWidget: widgetId
-
-			});
-			callback({
-				widgetId: widgetId,
-				accessLevel: accessLevel,
-				hasAccess: false
-			});
-			return;
-		}
-	}
-	
-	function checkAccess(widgetId, accessLevel, channel, senderId, callback) {
-		// Check cache
-		var accessLevelCacheId = accessLevel ? accessLevel.toUpperCase() : senderId;
-        var accessLevelFormatted = accessLevel ? accessLevel : "UNSPECIFIED ACCESS LEVEL";
-
-		if (Ozone.widgetAccesses[widgetId] && Ozone.widgetAccesses[widgetId][accessLevelCacheId]) {
-			// Make sure timestamp is less than 1 hour old
-			var accessLevelTimestamp = Ozone.widgetAccesses[widgetId][accessLevelCacheId].timestamp.getTime();
-			var currentTimestamp = (new Date()).getTime();
-			if ((currentTimestamp - accessLevelTimestamp) < Ozone.config.dataguard.accessLevelCacheTimeout) {
-				hasAccess = Ozone.widgetAccesses[widgetId][accessLevelCacheId].hasAccess;
-	        	
-	        	// Log failed access
-	    	    if (!hasAccess) {
-	    			Ozone.audit.log({
-	    				message: "Widget with id " + widgetId + " does not have sufficient privileges to access " + accessLevelFormatted + " data.",    				
-                        accessOutcomeGood: false,
-                        outcomeCategory: Ozone.util.hasAccess.outcomeCategories.insufficient,
-                        accessLevel: accessLevelFormatted,
-                        sendingWidget: senderId,
-                        receivingWidget: widgetId
-	    			});
-	    	    } else if (Ozone.config.dataguard.auditAllMessages || !accessLevel) {
-	    			Ozone.audit.log({
-	    				message: "Widget with id " + widgetId + " received message with access level " + accessLevelFormatted + " data.",    				
-                        accessOutcomeGood: true,
-                        accessLevel: accessLevelFormatted,
-                        sendingWidget: senderId,
-                        receivingWidget: widgetId                        
-	    			});
-	    	    }
-				
-				callback({
-					widgetId: widgetId,
-					accessLevel: accessLevel,
-					hasAccess: hasAccess
-				});
-				return;
-			}
-		}
-		
-		// Evaluate access level
-	    Ozone.util.Transport.send({
-	        url: OWF.getContainerUrl() + '/access',
-	        method: 'POST',
-	        onSuccess: function(response) {
-	        	hasAccess = response.data.hasAccess;
-	        	Ozone.widgetAccesses[widgetId] = Ozone.widgetAccesses[widgetId] || {};
-	        	Ozone.widgetAccesses[widgetId][accessLevelCacheId] = {
-	    			hasAccess: hasAccess,
-	    			timestamp: new Date()
-	        	};
-	        	
-	        	// Log failed access
-	    	    if (!hasAccess) {
-	    			Ozone.audit.log({
-	    				message: "Widget with id " + widgetId + " does not have sufficient privileges to access " + accessLevelFormatted + " data.",    				
-                        accessOutcomeGood: false,
-                        outcomeCategory: Ozone.util.hasAccess.outcomeCategories.insufficient,
-                        accessLevel: accessLevelFormatted,
-                        sendingWidget: senderId,
-                        receivingWidget: widgetId                        
-	    			});
-	    	    } else if (Ozone.config.dataguard.auditAllMessages || !accessLevel) {
-	    			Ozone.audit.log({
-	    				message: "Widget with id " + widgetId + " received message with access level " + accessLevelFormatted + " data.",
-                        accessOutcomeGood: true,
-                        accessLevel: accessLevelFormatted,                        
-                    	sendingWidget: senderId,
-                        receivingWidget: widgetId
-	    			});
-	    	    }
-	    	    
-				callback({
-					widgetId: widgetId,
-					accessLevel: accessLevel,
-					hasAccess: hasAccess
-				});
-	        },
-	        onFailure: function(response) {
-				Ozone.audit.log({
-					message: "Failed to determine whether Widget with id " + widgetId + " has sufficient privileges to access " + accessLevelFormatted + " data.",
-                    accessOutcomeGood: false,
-                    outcomeCategory: Ozone.util.hasAccess.outcomeCategories.noLevelGiven,
-                    accessLevel: accessLevelFormatted,
-                    sendingWidget: senderId,
-                    receivingWidget: widgetId                        
-
-				});
-
-		        if (response == undefined || response == null) response = "";
-
-		        if (!Ozone.Msg)
-		            Ozone.util.ErrorDlg.show(response,200,50);
-		        else
-		            Ozone.Msg.alert('Server Error',response,null,this,{
-		                cls: "owfAlert"
-		            });
-		        
-				callback({
-					widgetId: widgetId,
-					accessLevel: accessLevel,
-					hasAccess: false
-				});
-	        },
-	        autoSendVersion : false,
-	        content : {
-	        	widgetId: widgetId,
-	        	accessLevel: accessLevel ? accessLevel : null,
-				senderId: senderId ? senderId : null
-	        }
-	    });
-	}
-	
-	if (OWF.getOpenedWidgets && OWF.getOpenedWidgets instanceof Function) {
-		OWF.getOpenedWidgets(function(openedWidgets) {
-			for (var i = 0; i < openedWidgets.length; i++) {
-				var w = openedWidgets[i];
-				if (widgetId == w.id) widgetId = w.widgetGuid;
-	  	  		if (senderId == w.id) senderId = w.widgetGuid;
-			}
-			checkAccess(widgetId, accessLevel, channel, senderId, callback);
-		});
-	} else {
-  	  	// Ensure widgetId and senderId point to widget guid, not instance id
-  	  	var openedWidgets = OWF.Container.Eventing.getOpenedWidgets();
-  	  	for (var i = 0; i < openedWidgets.length; i++) {
-  	  		var w = openedWidgets[i];
-  	  		if (widgetId == w.id) widgetId = w.widgetGuid;
-  	  		if (senderId == w.id) senderId = w.widgetGuid;
-  	  	}
-		checkAccess(widgetId, accessLevel, channel, senderId, callback);
-	}
-};
-
-Ozone.util.hasAccess.outcomeCategories = { noLevelGiven: "NOT_SPECIFIED", insufficient: "INSUFFICIENT_ACCESS" };
-
-
-
 var guid = guid || {};
 var Ozone = Ozone || {};
 Ozone.util = Ozone.util || {};
@@ -12518,7 +12227,7 @@ Ozone.components.keys.MoveHotKeys = Ozone.components.keys.MoveHotKeys || {};
         exclusive: true
     };
 
-    k.LAUNCH_MENU = { key: 'F'.charCodeAt(0) };
+    k.LAUNCH_MENU = { key: 'L'.charCodeAt(0) };
 
     k.HELP = {
         key: 'H'.charCodeAt(0),
@@ -12850,9 +12559,9 @@ Ozone.layout.ConfigurationWindowString = {
 };
 
 Ozone.layout.CreateViewWindowString = {
-    createNew: 'Create new layout',
-    createFromExisting: 'Use the layout of an existing Dashboard:',
-    importView: 'Import a Dashboard from a file:'
+    createNew: 'Create new',
+    createFromExisiting: 'Create from existing',
+    importView: 'Import'
 };
 
 Ozone.layout.ManageViewsWindowString = {
@@ -12875,12 +12584,12 @@ Ozone.layout.tooltipString = {
 	manageDashboardsContent: 		'This screen allows users to rearrange, edit, and delete dashboards. It also allows users to set their language preference.',
 	createDashboardTitle: 			'Create Dashboard',
 	createDashboardContent: 		'This screen allows users to create blank dashboards, copy an existing dashboard, or import a dashboard from a shared configuration.',
-	addWidgetsTitle: 				'Favorites Menu (Alt+Shift+F)',
-	addWidgetsContent: 				'This button opens or closes the Favorites Menu, allowing users to add widgets to their current dashboard.',
+	addWidgetsTitle: 				'Launch Menu (Alt+Shift+L)',
+	addWidgetsContent: 				'This button opens or closes the Launch Menu, allowing users to add widgets to their current dashboard.',
 	dashboardSwitcherTitle:			'Switcher (Alt+Shift+C)',
 	dashboardSwitcherContent:		'This button opens or closes the Switcher, allowing users to switch between their dashboards.',
-	marketplaceWindowTitle:			'Apps Mall (Alt+Shift+M)',
-	marketplaceWindowContent:		'This button opens the Apps Mall window, allowing users to discover widgets in Apps Mall and add them to their Favorites menu.',
+	marketplaceWindowTitle:			'Marketplace (Alt+Shift+M)',
+	marketplaceWindowContent:		'This button opens the Marketplace window, allowing users to discover widgets in Marketplace and add them to their OWF instance.',
     metricWindowTitle:		    	'Metric (Alt+Shift+R)',
     metricWindowContent:      		'This button opens the Metric window, where widgets that monitor OWF and widget statistics are located.',
 	settingsTitle:					'Settings (Alt+Shift+S)',
@@ -12888,7 +12597,7 @@ Ozone.layout.tooltipString = {
 	adminToolsTitle:				'Administration (Alt+Shift+A)',
 	adminToolsContent:				'This button opens the Administration window, exposing administrators to functionality for managing groups, dashboards, widgets, and users.',
 	helpTitle:						'Help (Alt+Shift+H)',
-	helpContent:					'This button opens the Help window, allowing users to browse help files for assistance on using this application.',
+	helpContent:					'This button opens the Help window, allowing users to browse help files for assistance on using OWF.',
 	shareTitle: 					'Share Dashboard',
 	shareContent: 					'This feature allows a user to export their current dashboard so that other users can import it.',
 	customizeDashboardTitle:		'Customize Dashboard',
@@ -13131,9 +12840,7 @@ Ozone.layout.DialogMessages = {
     personWidgetDef_WidgetContainerPanelTitle: 'Widgets',
 	marketplaceWindow_AddWidget: 'An error occurred while attempting to add the widget from Marketplace.',
 	marketplaceWindow_currentUser: 'Could not retrieve current user name and id.',
-    marketplaceWindow_AddSuccessful: 'The widget was added successfully from Marketplace.',
-    marketplaceWindow_WebappLaunchSuccessful: 'The web app was added successfully from Marketplace.',
-    marketplaceWindow_LaunchSuccessful: 'The widget was added successfully from Marketplace. Now choose the dashboard where you want the widget to launch. It must be different from the current dashboard.',
+    marketplaceWindow_AddSuccessful: 'The widget was added successfully from Marketplace',
 	widgetAdded: 'Selected widget is already added for this user',
 	marketplaceWindow_RequiredListingsAlertMsg: 'The widget you have launched will not work without some dependencies.  These widgets are listed below and will be additionally added to the launch menu.',
     fitPaneFullWarning: 'You are attempting to add a widget to a pane with a single-widget layout. Continuing will replace the existing widget.',
@@ -13141,9 +12848,7 @@ Ozone.layout.DialogMessages = {
     dashboardLockWarning: 'Locking this dashboard disables the Launch Menu. New widgets cannot be launched or added to this layout. Do you still want to lock this dashboard?',
     dashboardLockAlertTitle: 'Locked Dashboard',
     dashboardLockAlert: 'This dashboard is locked. Widgets cannot be added or removed from a locked dashboard.',
-    closeBackgroundWidgetWarning: ' is a background widget. You won’t see it on your screen because it runs behind the scenes.<br/><br/>To close the widget, click OK.',
-    launchWidgetTitle: 'Launch Widget',
-    launchWidgetAlert: 'Choose the dashboard where the widget will open.'
+    closeBackgroundWidgetWarning: ' is a background widget. You won’t see it on your screen because it runs behind the scenes.<br/><br/>To close the widget, click OK.'
 };
 
 Ozone.layout.ThemeSwitcherWindowConstants = {
@@ -13483,12 +13188,14 @@ Ozone.util.Transport.send = function(cfg) {
             },
             error: function(response, ioArgs) {
                 if (response.dojoType=='cancel') { return; }
-                if (cfg.ignoredErrorCodes != null && cfg.ignoredErrorCodes.length > 0 && 
-                        owfdojo.indexOf(cfg.ignoredErrorCodes,response.status) > -1){
-                    cfg.onSuccess({});
-                }
-                else {
-                    cfg.onFailure(response.responseText, response.status);
+                // FF2 kills all AJAX requests when you refresh. When this happens, it sets the status code to 0
+                if (response.status != 0 ){
+                    if (cfg.ignoredErrorCodes != null && cfg.ignoredErrorCodes.length > 0 && owfdojo.indexOf(cfg.ignoredErrorCodes,response.status) > -1){
+                        cfg.onSuccess({});
+                    }
+                    else {
+                        cfg.onFailure(response.responseText, response.status);
+                    }
                 }
             }
         }, hasBody);
@@ -15081,16 +14788,14 @@ gadgets.rpc = function() {
     //the fact that child popup windows with IFrames might exist.
     function getTargetWin(id) {
       if (typeof id === "undefined" || id === "..") {
-          //Check to see if we are an iframe in a child window, and if so use the opener
+          // Chrome 30 throws SecurityError when accessing opener property on window.parent
           try {
-	          if(window.parent.opener) {
-	              return window.parent.opener.parent;
-	          }
-      	  }
-      	  catch(err) {
-
-      	  }
-      	  
+            //Check to see if we are an iframe in a child window, and if so use the opener
+            if(sameDomain[id] !== false && window.parent.opener) {
+                return window.parent.opener.parent;
+            }
+          }
+          catch(e) {}
           //Normal case, we are an IFrame in a page
           return window.parent;
       }
@@ -15160,7 +14865,6 @@ gadgets.rpc = function() {
     if (sameDomain[target] !== false) {
       // Seed with a negative, typed value to avoid
       // hitting this code path repeatedly
-      sameDomain[target] = false;
       var targetEl = getTargetWin(target);
 
       try {
@@ -15528,8 +15232,8 @@ gadgets.pubsub = (function() {
      * @param {string} channel Channel name.
      * @param {string} message Message to publish.
      */
-    publish: function(channel, message, dest, accessLevel) {
-      gadgets.rpc.call('..', 'pubsub', null, 'publish', channel, message, dest, accessLevel);
+    publish: function(channel, message, dest) {
+      gadgets.rpc.call('..', 'pubsub', null, 'publish', channel, message, dest);
     },
 
     /**
@@ -18007,13 +17711,12 @@ Ozone.eventing.Widget.prototype = {
      * @param {String} [dest] The id of a particular destination.  Defaults to null which sends to all
      *                 subscribers on the channel.  See <a href="#getWidgetId">Ozone.eventing.Widget.getWidgetId</a>
      *                 for a description of the id.
-     * @param {String} accessLevel The minimum access level a widget must have to receive the message.
      * @example
      * this.widgetEventingController = Ozone.eventing.Widget.getInstance();
      * this.widgetEventingController.publish("ClockChannel", currentTimeString);
      */
-    publish : function(channelName, message, dest, accessLevel) {
-        gadgets.pubsub.publish(channelName, message, dest, accessLevel);
+    publish : function(channelName, message, dest) {
+        gadgets.pubsub.publish(channelName, message, dest);
         return this;
     }
 };
@@ -18115,7 +17818,6 @@ OWF = window.OWF ? window.OWF : {};
              */
             startActivity:function (intent, data, handler, dest) {
                 var destIds = [];
-        		var accessLevel = data.accessLevel;
 
                 //pull destIds from any proxies passed in
                 if (dest != null) {
@@ -18148,7 +17850,7 @@ OWF = window.OWF ? window.OWF : {};
                                             if (widgets.length == destWidgetIds.length) {
                                                 handler(widgets);
                                             }
-                                        }, accessLevel);
+                                        });
                                     }
 
                                 }
@@ -19262,86 +18964,90 @@ Ozone.dragAndDrop = Ozone.dragAndDrop ? Ozone.dragAndDrop : {};
  */
 Ozone.dragAndDrop.WidgetDragAndDrop = function(cfg) {
 
-  this.listeners = {};
-  this.callbacks = {};
-  this.dragging = false;
-  this.dropEnabledFlag = false;
-  this.dropZoneHandlers = [];
+    this.listeners = {};
+    this.callbacks = {};
+    this.dragging = false;
+    this.dropEnabledFlag = false;
+    this.dropZoneHandlers = [];
 
-  cfg = cfg || {};
+    cfg = cfg || {};
 
-  //set initial drag text
-  this.dragIndicatorText = cfg.dragIndicatorText ? cfg.dragIndicatorText : 'Dragging Data';
+    //set initial drag text
+    this.dragIndicatorText = cfg.dragIndicatorText ? cfg.dragIndicatorText : 'Dragging Data';
 
-  if (cfg.callbacks != null && owfdojo.isObject(cfg.callbacks)) {
-    owfdojo.mixin(this.callbacks, cfg.callbacks)
-  }
-
-  //create drag indicator
-  this.dragIndicator = this.createDragIndicator();
-  this.dragIndicatorTextNode = owfdojo.query('span.ddText', this.dragIndicator)[0];
-
-  this.widgetEventingController = cfg.widgetEventingController || Ozone.eventing.Widget.instance;
-
-  if (cfg.keepMouseListenersAttached === undefined && owfdojo.isIE) {
-    cfg.keepMouseListenersAttached = true;
-  }
-
-  if (cfg.autoInit || cfg.autoInit === undefined) {
-    this.init(cfg);
-  }
-
-  function fireMouseEvent(el, type, msg) {
-    var evt;
-    if (document.createEvent) {
-      evt = document.createEvent('MouseEvents');
-      evt.initMouseEvent(type, true, true, window, 1,
-      msg.screenX, msg.screenY, msg.pageX, msg.pageY,
-      false, false, false, false, null, null);
-      el.dispatchEvent(evt);
-    } else if (document.createEventObject) {
-      evt = document.createEventObject();
-      el.fireEvent('on' + type, evt);
-    }
-  }
-
-  gadgets.rpc.register('_fire_mouse_move', owfdojo.hitch(this, function(msg) {
-
-    var el = document.elementFromPoint(msg.pageX, msg.pageY);
-
-    if (this.getFlashWidgetId()) {
-      if (msg.sender !== this.widgetEventingController.getWidgetId()) {
-        Ozone.util.getFlashApp().dispatchExternalMouseEvent(msg.pageX, msg.pageY);
-      }
-      this.mouseMove(msg, true);
-    } else {
-      if (!arguments.callee.lastEl) {
-        arguments.callee.lastEl = el;
-        fireMouseEvent(el, 'mouseover', msg);
-      } else if (arguments.callee.lastEl !== el) {
-        //console.log('lastEl ', arguments.callee.lastEl);
-        //console.log('el ', el);
-        fireMouseEvent(arguments.callee.lastEl, 'mouseout', msg);
-        fireMouseEvent(el, 'mouseover', msg);
-        arguments.callee.lastEl = el;
-      }
-
-      fireMouseEvent(el, 'mousemove', msg);
+    if (cfg.callbacks != null && owfdojo.isObject(cfg.callbacks)) {
+      owfdojo.mixin(this.callbacks, cfg.callbacks)
     }
 
-  }));
+    //create drag indicator
+    this.dragIndicator = this.createDragIndicator();
+    this.dragIndicatorTextNode = owfdojo.query('span.ddText', this.dragIndicator)[0];
 
-  gadgets.rpc.register('_fire_mouse_up', owfdojo.hitch(this, function(msg) {
-    var el = document.elementFromPoint(msg.pageX, msg.pageY);
-    if (el && el.nodeName === 'OBJECT') {
-      this.mouseUp(msg, true);
-    } else {
-      fireMouseEvent(el, 'mouseup', msg);
+    this.widgetEventingController = cfg.widgetEventingController || Ozone.eventing.Widget.instance;
+
+    if (cfg.keepMouseListenersAttached === undefined && owfdojo.isIE) {
+        cfg.keepMouseListenersAttached = true;
     }
-  }));
 
-  Ozone.dragAndDrop.WidgetDragAndDrop.instance = this;
-  return this;
+    if (cfg.autoInit || cfg.autoInit === undefined) {
+        this.init(cfg);
+    }
+
+    function fireMouseEvent(el, type, msg) {
+        var evt;
+        if(document.createEvent) {
+            evt = document.createEvent('MouseEvents');
+            evt.initMouseEvent(type, true, true, window, 1, 
+                msg.screenX, msg.screenY, msg.pageX, msg.pageY, 
+                false, false, false, false, null, null
+            );
+            el.dispatchEvent(evt);
+        } else if( document.createEventObject ) {
+            evt = document.createEventObject();
+            el.fireEvent('on' + type, evt);
+        }
+    }
+
+    gadgets.rpc.register('_fire_mouse_move', owfdojo.hitch(this, function(msg) {
+
+        var el = document.elementFromPoint(msg.pageX, msg.pageY);
+
+        if(this.getFlashWidgetId()) {
+            if(msg.sender !== this.widgetEventingController.getWidgetId()) {
+                Ozone.util.getFlashApp().dispatchExternalMouseEvent(msg.pageX, msg.pageY);
+            }
+            this.mouseMove(msg, true);
+        }
+        else {
+            if(!arguments.callee.lastEl) {
+                arguments.callee.lastEl = el;
+                fireMouseEvent(el, 'mouseover', msg);
+            }
+            else if(arguments.callee.lastEl !== el) {
+                //console.log('lastEl ', arguments.callee.lastEl);
+                //console.log('el ', el);
+                fireMouseEvent(arguments.callee.lastEl, 'mouseout', msg);
+                fireMouseEvent(el, 'mouseover', msg);
+                arguments.callee.lastEl = el;
+            }
+
+            fireMouseEvent(el, 'mousemove', msg);
+        }
+
+    }));
+
+    gadgets.rpc.register('_fire_mouse_up', owfdojo.hitch(this, function(msg) {
+        var el = document.elementFromPoint(msg.pageX, msg.pageY);
+        if(el && el.nodeName === 'OBJECT') {
+            this.mouseUp(msg, true);
+        }
+        else {
+            fireMouseEvent(el, 'mouseup', msg);
+        }
+    }));
+
+    Ozone.dragAndDrop.WidgetDragAndDrop.instance = this;
+    return this;
 };
 
 Ozone.dragAndDrop.WidgetDragAndDrop.prototype = {
@@ -19420,7 +19126,7 @@ Ozone.dragAndDrop.WidgetDragAndDrop.prototype = {
    * @param {Object} [cfg] config object
    * @see <a href="#constructor">constructor</a>
    */
-  init: function(cfg) {
+  init : function (cfg) {
     cfg = cfg || {};
 
     //subscribe to channels
@@ -19445,15 +19151,14 @@ Ozone.dragAndDrop.WidgetDragAndDrop.prototype = {
   /**
    * @private
    */
-  createDragIndicator: function() {
+  createDragIndicator: function () {
     return owfdojo.create('span', {
       className: 'ddBox ddBoxCannotDrop',
-      style: {
-        display: 'none'
-      },
+      style: {display: 'none'},
       innerHTML: '<span class="ddText">' + this.dragIndicatorText + '</span>'
     },
-    owfdojo.body());
+    owfdojo.body()
+    );
   },
 
   /**
@@ -19482,7 +19187,7 @@ Ozone.dragAndDrop.WidgetDragAndDrop.prototype = {
    *      }
    *  });
    */
-  doStartDrag: function(cfg) {
+  doStartDrag : function (cfg) {
 
     var dragStartCfg = {
       dragSourceId: this.widgetEventingController.getWidgetId()
@@ -19492,49 +19197,40 @@ Ozone.dragAndDrop.WidgetDragAndDrop.prototype = {
 
     //allow caller to pass extra properties to dragStart
     //be sure to not send the dragDropData
-    owfdojo.mixin(dragStartCfg, cfg);
+    owfdojo.mixin(dragStartCfg,cfg);
     delete dragStartCfg.dragDropData;
     delete dragStartCfg.dragZone;
 
     //start drag
-    this.onStartDrag(this.widgetEventingController.getWidgetId(), dragStartCfg);
+    this.onStartDrag(this.widgetEventingController.getWidgetId(),dragStartCfg);
 
     //send message to start dragging for other widgets - unsubscribe so we don't repeat onstartdrag
     this.widgetEventingController.unsubscribe(this.dragStartName);
-    this.widgetEventingController.publish(this.dragStartName, dragStartCfg, null, dragStartCfg.accessLevel);
+    this.widgetEventingController.publish(this.dragStartName, dragStartCfg);
     this.widgetEventingController.subscribe(this.dragStartName, owfdojo.hitch(this, this.onStartDrag));
 
     //send data to container
     this.widgetEventingController.publish(this.dragSendDataName, owfdojo.mixin({
       dragSourceId: this.widgetEventingController.getWidgetId()
-    }, cfg), '..');
+    },cfg),'..');
 
   },
 
   /**
    * @private
    */
-  onStartDrag: function(sender, msg) {
+  onStartDrag : function(sender, msg) {
 
     this.dragging = true;
+
     this.dragStartData = msg;
 
     if (owfdojo.isFunction(this.callbacks[this.dragStart])) {
-      var scope = this;
-      var senderId = Ozone.util.parseJson(sender);
-      Ozone.util.hasAccess({
-        widgetId: OWF.getWidgetGuid(),
-        accessLevel: msg.accessLevel,
-        senderId: senderId.id,
-        callback: function(response) {
-          if (response.hasAccess) {
-            //execute callback if false is returned don't continue
-            if (scope.callbacks[scope.dragStart](sender, msg) === false) {
-              scope.dragging = false;
-            }
-          }
-        }
-      });
+      //execute callback if false is returned don't continue
+      if (this.callbacks[this.dragStart](sender,msg) === false) {
+        this.dragging = false;
+        return;
+      }
     }
 
     //prevent IE bug where text is dragged instead of the node
@@ -19542,7 +19238,7 @@ Ozone.dragAndDrop.WidgetDragAndDrop.prototype = {
       document.onselectstart = function() {
         return false;
       };
-      document.ondragstart = function() {
+      document.ondragstart = function () {
         return false;
       };
     }
@@ -19562,7 +19258,7 @@ Ozone.dragAndDrop.WidgetDragAndDrop.prototype = {
   /**
    * @private
    */
-  onDragOut: function(sender, msg) {
+  onDragOut : function(sender, msg) {
     owfdojo.style(this.dragIndicator, {
       display: 'none'
     });
@@ -19571,117 +19267,124 @@ Ozone.dragAndDrop.WidgetDragAndDrop.prototype = {
   /**
    * @private
    */
-  getMouseCoordinates: function(e) {
+  getMouseCoordinates: function (e) {
     var returnValue = null;
     if (e.pageX || e.pageY) {
       returnValue = {
-        x: e.pageX,
-        y: e.pageY
+        x : e.pageX,
+        y : e.pageY
       };
-    } else {
+    }
+    else {
       returnValue = {
-        x: e.clientX + document.body.scrollLeft - document.body.clientLeft,
-        y: e.clientY + document.body.scrollTop - document.body.clientTop
+        x : e.clientX + document.body.scrollLeft - document.body.clientLeft,
+        y : e.clientY + document.body.scrollTop - document.body.clientTop
       };
     }
     return returnValue;
   },
 
-  /**
-   * @private
-   */
-  mouseMove: function(e, fake) {
-    //only show the indicator if we are currenlty dragging
-    if (this.dragging === true) {
+    /**
+    * @private
+    */
+    mouseMove : function (e, fake) {
+        //only show the indicator if we are currenlty dragging
+        if (this.dragging === true) {
 
-      // if this is a flex widget, event is not faked and current dashboard layout is tabbed, fake 
-      // mouse events as soon as the drag starts
-      if (this.getFlashWidgetId() && fake !== true && Ozone.Widget.getDashboardLayout() === 'tabbed') {
-        gadgets.rpc.call('..', '_fake_mouse_move', null, {
-          sender: this.widgetEventingController.getWidgetId(),
-          pageX: e.pageX,
-          pageY: e.pageY,
-          screenX: e.screenX,
-          screenY: e.screenY
-        });
-        return;
-      }
+            // if this is a flex widget, event is not faked and current dashboard layout is tabbed, fake 
+            // mouse events as soon as the drag starts
+            if(this.getFlashWidgetId() && fake !== true && Ozone.Widget.getDashboardLayout() === 'tabbed') {
+                 gadgets.rpc.call('..', '_fake_mouse_move', null, {
+                    sender: this.widgetEventingController.getWidgetId(),
+                    pageX: e.pageX,
+                    pageY: e.pageY,
+                    screenX: e.screenX,
+                    screenY: e.screenY
+                });
+                return;
+            }
 
-      var clientWidth = null;
-      var clientHeight = null;
-      var mousePosition = this.getMouseCoordinates(e);
-      var leftWidth = mousePosition.x;
-      var topHeight = mousePosition.y;
+            var clientWidth = null;
+            var clientHeight = null;
+            var mousePosition = this.getMouseCoordinates(e);
+            var leftWidth = mousePosition.x;
+            var topHeight = mousePosition.y;
 
-      // Hide the drag indicator box while we move it
-      owfdojo.style(this.dragIndicator, {
-        display: 'none'
-      });
+            // Hide the drag indicator box while we move it
+            owfdojo.style(this.dragIndicator, {
+                display: 'none'
+            });
 
-      if (e === undefined) {
-        e = window.event;
-      }
+            if (e === undefined) {
+                e = window.event;
+            }
 
-      if (owfdojo.isIE) {
-        clientWidth = document.body.clientWidth;
-        clientHeight = document.body.clientHeight;
-      } else {
-        clientWidth = window.innerWidth;
-        clientHeight = window.innerHeight;
-      }
+            if (owfdojo.isIE) {
+                clientWidth = document.body.clientWidth;
+                clientHeight = document.body.clientHeight;
+            }
+            else {
+                clientWidth = window.innerWidth;
+                clientHeight = window.innerHeight;
+            }
 
-      if ((owfdojo.isFF && owfdojo.isFF >= 4) || this.getFlashWidgetId()) {
+            if((owfdojo.isFF && owfdojo.isFF >= 4) || this.getFlashWidgetId()) {
 
-        if (e.clientX < 0 || e.clientX > clientWidth || e.clientY < 0 || e.clientY > clientHeight) {
+                if(e.clientX < 0 || e.clientX > clientWidth || 
+                    e.clientY < 0 || e.clientY > clientHeight) {
 
-          // set variable on function to keep track if we faked an event
-          // so that we can fake mouseout later when mouseover the current widget
-          if (!arguments.callee._fakeEventCounter) arguments.callee._fakeEventCounter = 1;
-          else arguments.callee._fakeEventCounter += 1;
+                    // set variable on function to keep track if we faked an event
+                    // so that we can fake mouseout later when mouseover the current widget
+                    if(!arguments.callee._fakeEventCounter)
+                        arguments.callee._fakeEventCounter = 1;
+                    else
+                        arguments.callee._fakeEventCounter += 1;
+                    
+                    gadgets.rpc.call('..', '_fake_mouse_move', null, {
+                        sender: this.widgetEventingController.getWidgetId(),
+                        pageX: e.pageX,
+                        pageY: e.pageY,
+                        screenX: e.screenX,
+                        screenY: e.screenY
+                    });
+                    return;
+                }
+                else if( arguments.callee._fakeEventCounter ) {
+                    // we had faked a mousemove event before
+                    // now fake mouseout event on the container
+                    arguments.callee._fakeEventCounter = null;
+                    gadgets.rpc.call('..', '_fake_mouse_out');
+                }
+            }
 
-          gadgets.rpc.call('..', '_fake_mouse_move', null, {
-            sender: this.widgetEventingController.getWidgetId(),
-            pageX: e.pageX,
-            pageY: e.pageY,
-            screenX: e.screenX,
-            screenY: e.screenY
-          });
-          return;
-        } else if (arguments.callee._fakeEventCounter) {
-          // we had faked a mousemove event before
-          // now fake mouseout event on the container
-          arguments.callee._fakeEventCounter = null;
-          gadgets.rpc.call('..', '_fake_mouse_out');
+            // flipping mechanism when the cursor reaches the right or bottom edge of the widget
+            this.dragIndicator.style.top = topHeight + 19 + "px";
+
+            var rightLimit = clientWidth - 100;
+            if ((leftWidth < clientWidth) && (leftWidth > rightLimit)) {
+                this.dragIndicator.style.left = leftWidth - 88 + "px";
+            }
+            else {
+                this.dragIndicator.style.left = leftWidth + 12 + "px";
+            }
+            var bottomLimit = clientHeight - 40;
+            if ((topHeight > bottomLimit) && (topHeight < clientHeight)) {
+                this.dragIndicator.style.top = topHeight - 30 + "px";
+            }
+
+            // set text on indicator
+            this.dragIndicatorTextNode.innerHTML = this.dragIndicatorText;
+            owfdojo.style(this.dragIndicator, {
+                display: 'block'
+            });
+
         }
-      }
-
-      // flipping mechanism when the cursor reaches the right or bottom edge of the widget
-      this.dragIndicator.style.top = topHeight + 19 + "px";
-
-      var rightLimit = clientWidth - 100;
-      if ((leftWidth < clientWidth) && (leftWidth > rightLimit)) {
-        this.dragIndicator.style.left = leftWidth - 88 + "px";
-      } else {
-        this.dragIndicator.style.left = leftWidth + 12 + "px";
-      }
-      var bottomLimit = clientHeight - 40;
-      if ((topHeight > bottomLimit) && (topHeight < clientHeight)) {
-        this.dragIndicator.style.top = topHeight - 30 + "px";
-      }
-
-      // set text on indicator
-      this.dragIndicatorTextNode.innerHTML = this.dragIndicatorText;
-      owfdojo.style(this.dragIndicator, {
-        display: 'block'
-      });
-
-    }
-  },
+    },
 
   /**
    * @private
    */
-  onDragStopInContainer: function(sender, msg) {
+  onDragStopInContainer : function(sender, msg) {
     owfdojo.style(this.dragIndicator, {
       display: 'none'
     });
@@ -19699,7 +19402,6 @@ Ozone.dragAndDrop.WidgetDragAndDrop.prototype = {
     this.setDropEnabled(false);
 
     if (owfdojo.isFunction(this.callbacks[this.dragStop])) {
-      var scope = this;
       this.callbacks[this.dragStop](this.dropTarget);
     }
   },
@@ -19707,7 +19409,7 @@ Ozone.dragAndDrop.WidgetDragAndDrop.prototype = {
   /**
    * @private
    */
-  mouseUp: function(e, fake) {
+  mouseUp : function (e, fake) {
     if (this.dragging === true) {
       this.dragging = false;
 
@@ -19716,7 +19418,7 @@ Ozone.dragAndDrop.WidgetDragAndDrop.prototype = {
         document.onselectstart = function() {
           return true;
         };
-        document.ondragstart = function() {
+        document.ondragstart = function () {
           return true;
         };
       }
@@ -19725,29 +19427,33 @@ Ozone.dragAndDrop.WidgetDragAndDrop.prototype = {
         display: 'none'
       });
 
-      if (this.getFlashWidgetId()) {
+      if(this.getFlashWidgetId()) {
 
-        var clientWidth = null;
-        var clientHeight = null;
-        if (owfdojo.isIE) {
-          clientWidth = document.body.clientWidth;
-          clientHeight = document.body.clientHeight;
-        } else {
-          clientWidth = window.innerWidth;
-          clientHeight = window.innerHeight;
-        }
+          var clientWidth = null;
+          var clientHeight = null;
+          if (owfdojo.isIE) {
+              clientWidth = document.body.clientWidth;
+              clientHeight = document.body.clientHeight;
+          }
+          else {
+              clientWidth = window.innerWidth;
+              clientHeight = window.innerHeight;
+          }
 
-        if ((e.clientX < 0 || e.clientX > clientWidth || e.clientY < 0 || e.clientY > clientHeight || Ozone.Widget.getDashboardLayout() === 'tabbed') && fake !== true) {
-
-          gadgets.rpc.call('..', '_fake_mouse_up', null, {
-            sender: this.widgetEventingController.getWidgetId(),
-            pageX: e.pageX,
-            pageY: e.pageY,
-            screenX: e.screenX,
-            screenY: e.screenY
-          });
-          return;
-        }
+          if((e.clientX < 0 || e.clientX > clientWidth || 
+                e.clientY < 0 || e.clientY > clientHeight
+                || Ozone.Widget.getDashboardLayout() === 'tabbed')
+                && fake !== true) {
+              
+              gadgets.rpc.call('..', '_fake_mouse_up', null, {
+                  sender: this.widgetEventingController.getWidgetId(),
+                  pageX: e.pageX,
+                  pageY: e.pageY,
+                  screenX: e.screenX,
+                  screenY: e.screenY
+              });
+              return;
+          }
       }
 
       //disconnect listeners
@@ -19760,21 +19466,20 @@ Ozone.dragAndDrop.WidgetDragAndDrop.prototype = {
       this.dropTarget = e.target;
 
       //send message
-      this.widgetEventingController.publish(this.dragStopInWidgetName, this.widgetEventingController.getWidgetId(), null, this.dragStartData.accessLevel);
+      this.widgetEventingController.publish(this.dragStopInWidgetName, this.widgetEventingController.getWidgetId());
 
-      if (owfdojo.isFunction(this.callbacks[this.dragStop])) {
-        this.callbacks[this.dragStop](this.dropTarget);
+  //    if (owfdojo.isFunction(this.callbacks[this.dragStop])) {
+  //      this.callbacks[this.dragStop](this.dropTarget);
+  //    }
       }
-    }
   },
 
   /**
    * @private
    */
-  dropReceiveData: function(sender, msg, channel) {
+  dropReceiveData : function (sender, msg, channel) {
 
-    // only if the mouse is over a drop zone and this widget has the 
-    // access level to receive the data being sent
+    //only if the mouse is over a drop zone
     if (this.dropEnabledFlag) {
       if (this.dropTarget) {
         msg.dropTarget = this.dropTarget;
@@ -19783,7 +19488,11 @@ Ozone.dragAndDrop.WidgetDragAndDrop.prototype = {
         for (var i = 0; i < this.dropZoneHandlers.length; i++) {
           //match either on id or class or is target node a child of the dropZone
           //also make sure the dropZone is not the same as the dragZone
-          if (((this.dropTarget.id == this.dropZoneHandlers[i].id && this.dropTarget.id != null) || (owfdojo.hasClass(this.dropTarget, this.dropZoneHandlers[i].className)) || (owfdojo.isDescendant(this.dropTarget, this.dropZoneHandlers[i].dropZone))) && this.dragZone != this.dropZoneHandlers[i].dropZone) {
+          if (((this.dropTarget.id == this.dropZoneHandlers[i].id && this.dropTarget.id != null)
+                  || (owfdojo.hasClass(this.dropTarget, this.dropZoneHandlers[i].className))
+                  || (owfdojo.isDescendant(this.dropTarget, this.dropZoneHandlers[i].dropZone)))
+                  && this.dragZone != this.dropZoneHandlers[i].dropZone
+                  ) {
             this.dropZoneHandlers[i].handler(msg);
           }
         }
@@ -19833,14 +19542,15 @@ Ozone.dragAndDrop.WidgetDragAndDrop.prototype = {
    *      this.subscribeToChannel(msg.dragDropData);
    *   }));
    */
-  addCallback: function(eventName, cb) {
+  addCallback : function(eventName, cb) {
 
     if (this.callbacks[eventName] == null) {
       //put dummy function in
       this.callbacks[eventName] = cb;
-    } else {
+    }
+    else {
       //callback already exists chain the subsequent callbacks to the first
-      owfdojo.connect(this.callbacks, eventName, cb);
+      owfdojo.connect(this.callbacks,eventName,cb);
     }
   },
   /**
@@ -19915,29 +19625,27 @@ Ozone.dragAndDrop.WidgetDragAndDrop.prototype = {
    *
    */
   addDropZoneHandler: function(cfg) {
-    this.dropZoneHandlers.push(cfg);
+    this.dropZoneHandlers.push(cfg)
   },
   /**
    * @description returns whether the a drop is enabled (this is only true when the mouse is over a drop zone)
    */
-  getDropEnabled: function() {
+  getDropEnabled : function() {
     return this.dropEnabledFlag;
   },
 
   /**
    * @description returns whether a drag is in progress
    */
-  isDragging: function() {
+  isDragging : function() {
     return this.dragging;
   },
 
   /**
    * @description returns data sent when a drag was started
    */
-  getDragStartData: function() {
-    return owfdojo.mixin(this.dragStartData, {
-      dragZone: this.dragZone
-    });
+  getDragStartData : function() {
+    return owfdojo.mixin(this.dragStartData,{dragZone:this.dragZone});
   },
 
   /**
@@ -19959,25 +19667,13 @@ Ozone.dragAndDrop.WidgetDragAndDrop.prototype = {
    *    }
    *  },this);
    */
-  setDropEnabled: function(dropEnabled) {
+  setDropEnabled : function(dropEnabled) {
     if (dropEnabled) {
-      var scope = this;
-      var data = this.getDragStartData();
-
-      var senderId = Ozone.util.parseJson(data.dragSourceId);
-      Ozone.util.hasAccess({
-        widgetId: OWF.getWidgetGuid(),
-        accessLevel: data.accessLevel,
-        senderId: senderId.id,
-        callback: function(response) {
-          scope.dropEnabledFlag = response.hasAccess;
-          if (scope.dropEnabledFlag) {
-            owfdojo.removeClass(scope.dragIndicator, 'ddBoxCannotDrop');
-            owfdojo.addClass(scope.dragIndicator, 'ddBoxCanDrop');
-          }
-        }
-      });
-    } else {
+      this.dropEnabledFlag = true;
+      owfdojo.removeClass(this.dragIndicator, 'ddBoxCannotDrop');
+      owfdojo.addClass(this.dragIndicator, 'ddBoxCanDrop');
+    }
+    else {
       this.dropEnabledFlag = false;
       owfdojo.removeClass(this.dragIndicator, 'ddBoxCanDrop');
       owfdojo.addClass(this.dragIndicator, 'ddBoxCannotDrop');
@@ -20016,6 +19712,8 @@ Ozone.dragAndDrop.WidgetDragAndDrop.getInstance = function(cfg) {
   }
   return owfdojo.mixin(Ozone.dragAndDrop.WidgetDragAndDrop.instance, cfg);
 };
+
+
 /**
  * @namespace
  */
@@ -20900,7 +20598,7 @@ Ozone.eventing.priv = Ozone.eventing.priv || {};
      *           Ozone.eventing.MyMapWidget.plot(1.1,2.2);
      *        }
      */
-    function importWidget(widgetId, ready, accessLevel) {
+    function importWidget(widgetId, ready) {
         // assume JSON
         if(widgetId.charAt(0) === '{') {
             widgetId = OWF.Util.parseJson(widgetId).id;
@@ -20920,9 +20618,7 @@ Ozone.eventing.priv = Ozone.eventing.priv || {};
 
         var id = getIdFromWindowName();
         var srcWidgetIframeId = '{\"id\":\"' + id + '\"}';
-
         gadgets.rpc.call("..", 'GET_FUNCTIONS', processFunctionsFromContainer, widgetId, srcWidgetIframeId);
-
         return proxy;
     }
 
@@ -21114,7 +20810,7 @@ OWF = window.OWF ? window.OWF : {};
 		dragAndDropController,
 		launchingController,
 		chromeController;
-	
+
 	owfdojo.mixin(OWF, /** @lends OWF */ {
 
 		/**
@@ -21195,14 +20891,6 @@ OWF = window.OWF ? window.OWF : {};
 		 */
 		Lang: Ozone.lang,
 		
-		/**
-		 * 
-		 *
-		 * @namespace
-		 * @name OWF.Audit
-		 */
-		Audit: Ozone.audit,
-
 		Version: Ozone.version,
 
 		/**
@@ -21401,20 +21089,7 @@ OWF = window.OWF ? window.OWF : {};
 		// RPC/Directed Eventing API
 		function initRPC() {
 			OWF.RPC.registerFunctions = Ozone.eventing.registerFunctions;
-			
-			OWF.RPC.getWidgetProxy = function(widgetId, ready, accessLevel) {
-				Ozone.util.hasAccess( {
-					widgetId: widgetId,
-					accessLevel: accessLevel,
-					senderId: OWF.getWidgetGuid(),
-					callback: function(response) {
-						if (response.hasAccess)
-							return Ozone.eventing.importWidget(widgetId, ready)
-					}
-				});				
-			}
-
-			
+			OWF.RPC.getWidgetProxy = Ozone.eventing.importWidget;
 			OWF.RPC.handleDirectMessage = function(fn) {
 				if(typeof fn !== 'function') {
 					throw 'Error: fn must be a function';
@@ -21485,14 +21160,6 @@ OWF = window.OWF ? window.OWF : {};
 			}
 		}
 
-		// Audit API
-		function initAudit() {
-			for(var i in Ozone.audit) {
-				if(typeof Ozone.audit[ i ] === 'function')
-					OWF.Audit[ i ] = Ozone.audit[ i ];
-			}
-		}
-
 		eventingController = Ozone.eventing.Widget.getInstance(function() {
 
 			dragAndDropController = Ozone.dragAndDrop.WidgetDragAndDrop.getInstance({
@@ -21518,20 +21185,6 @@ OWF = window.OWF ? window.OWF : {};
 				readyList[i].fn.call(readyList[i].scope);
 			}
 
-		});
-
-		Ozone.config = Ozone.config ? Ozone.config : {};
-		Ozone.config.dataguard = Ozone.config.dataguard ? Ozone.config.dataguard : {};
-
-		Ozone.util.Transport.send({
-			url: OWF.getContainerUrl() + '/access/getConfig',
-			method: 'GET',
-			onSuccess: function(response) {
-				Ozone.config.dataguard.allowMessagesWithoutAccessLevel = response.allowMessagesWithoutAccessLevel;
-				Ozone.config.dataguard.auditAllMessages = response.auditAllMessages;
-				Ozone.config.dataguard.restrictMessages = response.restrictMessages;
-				Ozone.config.dataguard.accessLevelCacheTimeout = response.accessLevelCacheTimeout;
-			}
 		});
 
 	};
