@@ -1,7 +1,7 @@
 var EverestConfig = {
 	endpoint: {
 
-		base: "http://everest-build:8082" /*,
+		base: "http://healthcare-demo:8081" /*,
 		patient: 	// show ability to extend
 		*/
 	}
