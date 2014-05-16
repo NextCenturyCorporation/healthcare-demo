@@ -46,6 +46,8 @@ var app = app || {};
             rawTemplate: rawReminderFormTemplate
         }).render();
         $('div#reminderFormColumn').append(app.reminderFormView.el);
+        // send a message to the storyLine that the reminder selected has been changed
+        OWF.Eventing.publish('com.nextcentury.everest.storyLine.events', JSON.stringify(patientReminder));
     };
 
     app.router = new Backbone.Router();
