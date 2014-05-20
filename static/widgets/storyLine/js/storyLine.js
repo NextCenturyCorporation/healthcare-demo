@@ -1,5 +1,7 @@
 var app = app || {};
 
+var t1 = null;
+
 (function() {
 
     /*         *\
@@ -71,8 +73,10 @@ var app = app || {};
     bandInfo[1].syncWith =0;
 
     app.initialize = function() {
-        //$("#tline").syrinxTimeline({ bands: bandInfo });
-        Timeline.create(document.getElementById("tline"), bandInfo, Timeline.Horizontal);
+    tl = Timeline.create(document.getElementById("tline"), bandInfo, Timeline.Horizontal);
+    // center the curent date in the storyLine
+    var currentDate = Timeline.DateTime.parseGregorianDateTime(new Date());
+    tl.getBand(0).setCenterVisibleDate(currentDate);
     };
 
     /**
@@ -88,6 +92,7 @@ var app = app || {};
     *    }
     */
     app.addEvents = function(incomingEvents) {
+        var earliestDate = Date.now();   // default to right now
         var eventData = {};
         if (incomingEvents instanceof Array) {
           // An array of data points - that's the desired format
@@ -101,14 +106,31 @@ var app = app || {};
         // internal list.
         for(var i=0; i<eventData.events.length; ++i) {
           var date = Date.parse(eventData.events[i].start);
+          if (date < earliestDate) {
+            earliestDate = date;  // hold on to earliest date
+          }
           datapoints.push(date);
           // TODO: Be more efficient.  Use a binary search to find the right place to  insert it.
           datapoints = datapoints.sort();
         }
         eventSource.loadJSON(eventData, "");
+        // center the earliest date of all reminders in the storyLine
+        var centeringDate = new Date(earliestDate);
+        tl.getBand(0).setCenterVisibleDate(centeringDate);
 
         app.deduceLayout();
     }
+
+    /*
+     * Centers the timeline in the storyLine to the date passed in.
+     * @param dateStr The dueDate found in the patientReminder selected
+     * Method typically called when the user selects on a reminder in the reminders list. 
+    */
+    app.centerTimeLine = function(dateStr) {
+        // center the curent date in the storyLine
+        var centeringDate = new Date(dateStr);
+        tl.getBand(0).setCenterVisibleDate(centeringDate);
+    };
 
     app.clearEvents = function(incomingEvents) {
         datapoints = [];

@@ -27,6 +27,11 @@ if(OWF.Util.isRunningInOWF()) {
                 var events = message.events;
                 app.addEvents(events);
             }
+            // added to center the date when a reminder is selected.
+            if(message.dueDate){
+                app.centerTimeLine(message.dueDate);
+            }
+
 
         });
 
