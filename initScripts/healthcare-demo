@@ -64,6 +64,7 @@
 NAME=healthcare-demo
 NODE_BIN_DIR=/usr/bin
 NODE_PATH=/usr/lib/nodejs
+#APPLICATION_DIRECTORY=/home/demoadmin/healthcare-demo
 APPLICATION_DIRECTORY=/deploy/healthcare-demo
 APPLICATION_START=healthcareDemoApp.js
 PIDFILE=/deploy/healthcare-demo/healthcare-demo.pid
