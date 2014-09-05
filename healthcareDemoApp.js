@@ -32,13 +32,84 @@ if(!config.noDB){
 }
 
 var express = require('express');
+var fs = require('fs');
 var app = express();
+var httpsApp = express();
 var server = require('http').createServer(app);
 
-app.configure(function(){
+// Create options for creation to Express httpsServer
+var options = {
+  key: fs.readFileSync('owf/apache-tomcat-7.0.21/certs/healthcare-demo-ca.key'),
+  cert: fs.readFileSync('owf/apache-tomcat-7.0.21/certs/healthcare-demo-ca.crt'),
+  passphrase:'changeit'
+}	
+// Create the httpsServer using the options and httpsApp Express server
+var httpsServer = require('https').createServer(options, httpsApp);
+
+// Configure the Express http server
+configureExpress (app);       // used to run nodeJs in http mode
+// Configure the Express https server
+configureExpress (httpsApp);  // used to run nodeJs in https mode
+
+var socketio = require('socket.io');
+//Use Socket.IO for http server
+var io = socketio.listen(server);
+io.set('log level', 1);
+
+//configure socketio for http server
+io.on('connection', function(socket) {
+	socket.on('join_room', function (data) {
+		if(data.room === 'EVEREST.data.workflow') {
+			logger.debug("Joining socket to EVEREST.data.workflow room");
+			socket.join('EVEREST.data.workflow');
+		}
+	});
+});
+
+//Use Socket.IO for https server
+var httpsIo = socketio.listen(httpsServer);
+httpsIo.set('log level', 1);
+
+//configure socketio for https server
+httpsIo.on('connection', function(socket) {
+	socket.on('join_room', function (data) {
+		if(data.room === 'EVEREST.data.workflow') {
+			logger.debug("Joining socket to EVEREST.data.workflow room");
+			socket.join('EVEREST.data.workflow');
+		}
+	});
+});
+
+// establish listener for the http server
+server.listen(config.port, function(){
+//  logger.debug("Express server listening on port " + server.address().port + " in " + app.settings.env + " mode");
+  logger.info("Express server listening on port " + server.address().port + " in " + app.settings.env + " mode");
+});
+
+// establish listener for the http server
+httpsServer.listen(config.https_port, function(){
+  //logger.debug("Express httpsServer listening on port " + server.address().port + " in " + httpsApp.settings.env + " mode");
+  logger.info("Express httpsServer listening on port " + httpsServer.address().port + " in " + httpsApp.settings.env + " mode");
+});
+
+//Event routes
+logger.debug('Loading events');
+var RouterService = require('./services/router_service.js');
+// establish routerServices for the http and https Express servers
+var routerService = new RouterService(app, io, logger);
+var httpRouterService = new RouterService(httpsApp, httpsIo, logger);
+
+/**
+ * helper menthod used to configure an Express server
+ * @param app The Express server to configure
+ */
+function configureExpress (app) {
+
+    app.configure(function(){
 	app.use(express.bodyParser());
 	app.use(express.methodOverride());
 	app.use(app.router);
+        // set the starting point base url and directory where your files are.
 	app.use(express.static(__dirname + '/static'));
 	// allow jsonp to be used with jquery GET callback on REST calls
 	app.enable("jsonp callback");
@@ -82,28 +153,6 @@ app.configure(function(){
 		res.end(JSON.stringify({error: err.message}));
 		logger.error('Error ', {stack: err.stack});
 	});
-});
+    });
 
-var socketio = require('socket.io');
-//Use Socket.IO
-var io = socketio.listen(server);
-io.set('log level', 1);
-
-//configure socketio
-io.on('connection', function(socket) {
-	socket.on('join_room', function (data) {
-		if(data.room === 'EVEREST.data.workflow') {
-			logger.debug("Joining socket to EVEREST.data.workflow room");
-			socket.join('EVEREST.data.workflow');
-		}
-	});
-});
-
-server.listen(config.port, function(){
-  logger.debug("Express server listening on port " + server.address().port + " in " + app.settings.env + " mode");
-});
-
-//Event routes
-logger.debug('Loading events');
-var RouterService = require('./services/router_service.js');
-var routerService = new RouterService(app, io, logger);
+}

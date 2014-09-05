@@ -12,37 +12,6 @@
 DEFAULT_USER_PASSWORD="password"
 DEFAULT_KEYSTORE_PASSWORD="changeit"
 DEFAULT_COUNTRY_CODE="US"
-DEFAULT_OU="healthcare-demo0806"
-DEFAULT_O="healthcare-demo0806"
-DEFAULT_CITY="Columbia"
-DEFAULT_STATE="MD"
-DEFAULT_EMAIL_ADDR="demoadmin@healthcare-demo"
-
-function createConfigFile
-{
-
-        # set up local variables
-        local l_configFile=${1}.ca-config
-        echo "dir=." > ${l_configFile}
-        echo "[ req ]" >> ${l_configFile}
-        echo "x509_extensions=vthreeext" >> ${l_configFile}
-        echo "output_password=pass:${DEFAULT_KEYSTORE_PASSWORD}" >> ${l_configFile}
-        echo "distinguished_name = req_distinguished_name" >> ${l_configFile}
-        echo "prompt=no" >> ${l_configFile}
-        echo "[ req_distinguished_name ]"  >> ${l_configFile}
-        echo "organizationName=${DEFAULT_O}" >> ${l_configFile}
-        echo "organizationalUnitName=${DEFAULT_OU}" >> ${l_configFile}
-        echo "emailAddress=${DEFAULT_EMAIL_ADDR}" >> ${l_configFile}
-        echo "localityName=${DEFAULT_CITY}" >> ${l_configFile}
-        echo "stateOrProvinceName=${DEFAULT_STATE}" >> ${l_configFile}
-        echo "commonName=${1}" >> ${l_configFile}
-        echo "countryName=${DEFAULT_COUNTRY_CODE}" >> ${l_configFile}
-        echo "[ vthreeext ]" >> ${l_configFile}
-        echo "basicConstraints=CA:true" >> ${l_configFile}
-        echo "subjectKeyIdentifier=hash" >> ${l_configFile}
-        echo "authorityKeyIdentifier=keyid:always,issuer:always" >> ${l_configFile}
-
-}
 
 # createSelfSigningCertAuthority cakeyname cacertname hostname
 #
@@ -57,39 +26,37 @@ function createConfigFile
 function createSelfSigningCertAuthority
 {
     #set local variables
-        local l_cakeyname=${1}
-        local l_cacertname=${2}
-        if [ -e $l_cakeyname ]; then
-            echo "A certificate authority key named $l_cakeyname exists.  Removing and Recreating!"
-            rm ${l_cakeyname}
-        fi
-        if [ -e $l_cacertname ]; then
-            echo "A certificate authority certificate named $l_cacertname exists.  Removing and Recreating!"
-            rm ${l_cacertname}
-        fi
-        # generate the CA's config file if it doesn't exist
-        local l_configFile=${3}.ca-config
-        if [ ! -e $l_configFile ]; then
-              createConfigFile ${3} ;
-        fi
+	local l_cakeyname=${1}
+	local l_cacertname=${2}
+	local l_hostname=${3}
+   
+    # generate the user's config file	
+    local l_configFile=${l_hostname}.config
+	echo "dir=." >> ${l_configFile}
+	echo "[ req ]" >> ${l_configFile}
+	echo "output_password=pass:${DEFAULT_KEYSTORE_PASSWORD}" >> ${l_configFile}
+	echo "distinguished_name = req_distinguished_name" >> ${l_configFile}
+	echo "prompt=no" >> ${l_configFile}
+	echo "[ req_distinguished_name ]"  >> ${l_configFile}
+	echo "organizationName=${l_hostname}" >> ${l_configFile}
+	echo "organizationalUnitName=${l_hostname}" >> ${l_configFile}
+	echo "emailAddress=${l_hostname}" >> ${l_configFile}
+	echo "localityName=${l_hostname}" >> ${l_configFile}
+	echo "stateOrProvinceName=${l_hostname}" >> ${l_configFile}
+	echo "commonName=${l_hostname}" >> ${l_configFile}
+	echo "countryName=${DEFAULT_COUNTRY_CODE}" >> ${l_configFile}
 
-        #echo "openssl genrsa -des3 -out ${l_cakeyname} -passout pass:${DEFAULT_KEYSTORE_PASSWORD} 4096"
-        openssl genrsa -des3 -out ${l_cakeyname} -passout pass:${DEFAULT_KEYSTORE_PASSWORD} 4096
+	# generate certificate authority's keystore
+	openssl genrsa -des3 -out ${l_cakeyname} -passout pass:${DEFAULT_KEYSTORE_PASSWORD} 4096 
+	
+	# generate certificate authority's cert request
+	openssl req -new -x509 -days 365 -key ${l_cakeyname} -passin pass:${DEFAULT_KEYSTORE_PASSWORD} -out ${l_cacertname} -config ${l_configFile}
+	
 
-        # generate certificate authority's cert request
-        #echo "openssl req -new -x509 -days 365 -key ${l_cakeyname} -passin pass:${DEFAULT_KEYSTORE_PASSWORD} -out ${l_cacertname} -config ${l_configFile}"
-        openssl req -new -x509 -days 365 -key ${l_cakeyname} -passin pass:${DEFAULT_KEYSTORE_PASSWORD} -out ${l_cacertname} -config ${l_configFile}
+	# remove the config file--we don't need it anymore.
+	rm ${l_configFile}
 
-
-
-        # this is reused, don't remove it.
-#       rm ${l_configFile}
-        # increment serial number if the file exists
-        echo "00" >> ${1}.srl
-        echo -e "Created ${l_cakeyname} and ${l_cacertname} in `pwd` \n"
-        # display certificate entry
-        #echo "openssl x509 -text -noout -in ${l_cacertname}"
-        openssl x509 -text -noout -in ${l_cacertname}
+	echo -e "Created ${l_cakeyname} and ${l_cacertname} in `pwd` \n"
 
 }
 
@@ -116,39 +83,36 @@ function createServerCertificate
 	local l_cakeyname="${1}"
 	local l_cacertname="${2}"
 	local l_hostname="${3}"
-#        local l_friendlyname="${4}"
 	local l_hostkeystorename="${4}"
-        local l_caserialfile="${1}.srl"
 
-	local l_servercsrfile=${hostname}.csr
+	local l_servercertificaterequest=${hostname}.csr
+	local l_servercertname=${hostname}.crt
 
-	local l_servercertname=${hostname}-ca.crt
-        local l_serverkeyfile=${hostname}-ca.key
-        local l_p12file=${hostname}.p12
-        local l_configFile=${hostname}.ca-config
-        if [ ! -e $l_configFile ]; then
-              createConfigFile ${l_hostname} ;
-        fi
 	echo ""
-        # generate a request for a server certificate
-        #echo "openssl req -new -key ${l_serverkeyfile} -out ${l_servercsrfile} -config ${l_configFile}"
-        openssl req -new -key ${l_serverkeyfile} -out ${l_servercsrfile} -config ${l_configFile}
+	# generate server key
+	keytool -genkey -alias ${l_hostname} -keyalg RSA -keypass ${DEFAULT_KEYSTORE_PASSWORD} -keystore ${l_hostkeystorename}  -storepass ${DEFAULT_KEYSTORE_PASSWORD} -dname "CN=${l_hostname}, OU=${l_hostname}, O=${l_hostname}, L=${l_hostname}, S=${l_hostname}, C=${DEFAULT_COUNTRY_CODE}"
+	
+	# generate server certificate request and keystore
+	keytool -certreq -alias ${l_hostname} -keyalg RSA -file ${l_servercertificaterequest} -keystore ${l_hostkeystorename}  -storepass ${DEFAULT_KEYSTORE_PASSWORD} 
 
-        # sign request
-        #echo "openssl x509 -req -days 365 -in ${l_servercsrfile} -CA ${l_cacertname} -CAkey ${l_cakeyname} -passin pass:${DEFAULT_KEYSTORE_PASSWORD} -CAserial ${l_caserialfile} -out ${l_servercertname} -extfile ${l_configFile} -extensions vthreeext"
-        openssl x509 -req -days 365 -in ${l_servercsrfile} -CA ${l_cacertname} -CAkey ${l_cakeyname} -passin pass:${DEFAULT_KEYSTORE_PASSWORD} -CAserial ${l_caserialfile} -out ${l_servercertname} -extfile ${l_configFile} -extensions vthreeext
-
-        # export to p12 file
-        #echo "openssl pkcs12 -in ${l_servercertname} -inkey ${l_serverkeyfile} -out ${l_p12file} -export -name "${l_friendlyname}" -passout pass:${DEFAULT_KEYSTORE_PASSWORD}"
-        openssl pkcs12 -in ${l_servercertname} -inkey ${l_serverkeyfile} -out ${l_p12file} -export -name "${l_friendlyname}" -passout pass:${DEFAULT_KEYSTORE_PASSWORD}
+	# there is no way to pass in a password to the next command--the user must enter this manually
+	echo -e "\n************************************************************************\n"
+	echo -e "NOTE:  The password for the next step is ${DEFAULT_KEYSTORE_PASSWORD}."
+	echo -e "\n************************************************************************\n"
+	
+	# generate the signed certificate for the server hostname
+	openssl x509 -req -days 365 -in ${l_servercertificaterequest} -CA ${l_cacertname} -CAkey ${l_cakeyname} -set_serial ${RANDOM} -out ${l_servercertname}
+	
+	# import the ca into the keystore as a trust chain
+	keytool -import -trustcacerts -file ${l_cacertname} -keystore ${l_hostkeystorename} -storepass ${DEFAULT_KEYSTORE_PASSWORD} -noprompt -alias ${l_hostname}  
+	
+	# import the signed server hostname certificate into the keystore
+	keytool -import -file ${l_servercertname} -keystore ${l_hostkeystorename} -storepass ${DEFAULT_KEYSTORE_PASSWORD} -alias ${l_hostname}
 
 	echo -e "\n************************************************************************\n"
 	echo "${l_hostkeystorename} in `pwd` is the server keystore for you to use as your keystore "
 	echo "and truststore.  It's password is ${DEFAULT_KEYSTORE_PASSWORD}."
 	echo -e "\n************************************************************************\n"
-        # convert p12 file to jks
-        echo "keytool -v -importkeystore -srckeystore ${l_p12file} -srcstoretype PKCS12 -srcstorepass changeit -destkeystore ${3}.jks -deststoretype JKS -deststorepass changeit"
-        keytool -v -importkeystore -srckeystore ${l_p12file} -srcstoretype PKCS12 -srcstorepass changeit -destkeystore ${3}.jks -deststoretype JKS -deststorepass changeit
 
 }
 
@@ -164,6 +128,7 @@ function createUserCertificate
 	# set up varibles
 	local l_cakeyname="${1}"
 	local l_cacertname="${2}"
+
 	echo -e "\nEnter the username of the person you want to generate a certificate for:"
 	read l_username
 	echo ""
@@ -172,7 +137,7 @@ function createUserCertificate
 	local l_usercsrfile=${l_username}.csr
 	local l_crtfile=${l_username}.crt
 	local l_p12file=${l_username}.p12
-	local l_configFile=${l_username}.ca-config
+	local l_configFile=${l_username}.config
 
 	# generate the user's config file
 	echo dir=. > ${l_configFile}
@@ -191,20 +156,15 @@ function createUserCertificate
 	echo countryName=${DEFAULT_COUNTRY_CODE} >> ${l_configFile}
 
 	# generate the user's RSA private key
-
-	#echo "openssl genrsa -des4 -out ${l_userkeyfile} -passout pass:${DEFAULT_USER_PASSWORD} 4096 "
 	openssl genrsa -des3 -out ${l_userkeyfile} -passout pass:${DEFAULT_USER_PASSWORD} 4096 
 	
 	# generate a request for a user certificate 
-	#echo "openssl req -new -key ${l_userkeyfile} -passin pass:${DEFAULT_USER_PASSWORD} -out ${l_usercsrfile} -config ${l_configFile}"
 	openssl req -new -key ${l_userkeyfile} -passin pass:${DEFAULT_USER_PASSWORD} -out ${l_usercsrfile} -config ${l_configFile}
 	
 	# sign request
-	#echo "openssl x509 -req -days 365 -in ${l_usercsrfile} -CA ${l_cacertname} -CAkey ${l_cakeyname} -passin pass:${DEFAULT_KEYSTORE_PASSWORD} -set_serial ${RANDOM} -out ${l_crtfile}  "
 	openssl x509 -req -days 365 -in ${l_usercsrfile} -CA ${l_cacertname} -CAkey ${l_cakeyname} -passin pass:${DEFAULT_KEYSTORE_PASSWORD} -set_serial ${RANDOM} -out ${l_crtfile}  
 	
 	# export to p12 file	
-	#echo "openssl pkcs12 -in ${l_crtfile} -inkey ${l_userkeyfile} -out ${l_p12file} -export -name "${l_username}"  -passin pass:${DEFAULT_USER_PASSWORD} -passout pass:${DEFAULT_USER_PASSWORD}"
 	openssl pkcs12 -in ${l_crtfile} -inkey ${l_userkeyfile} -out ${l_p12file} -export -name "${l_username}"  -passin pass:${DEFAULT_USER_PASSWORD} -passout pass:${DEFAULT_USER_PASSWORD}
 
 	rm ${l_configFile}

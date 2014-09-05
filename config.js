@@ -1,7 +1,11 @@
 var config = {};
 
+// defaults appear to be loaded in 
+// ./node_modules/socket.io/node_modules/socket.io-client/node_modules/active-x-obfuscator/node_modules/zeparser/benchmark.html
 //Port to listen on
 config.port = process.env.PORT || 8081;
+//HttpsPort to listen on
+config.https_port = process.env.SECURE_SERVER_HTTPS_PORT || 8444;
 //Database address
 config.db_host = process.env.DB_HOST || '127.0.0.1';
 //Database port
